@@ -1,5 +1,6 @@
 /**
- *  Copyright 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,7 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package brut.directory;
 
 import brut.common.BrutException;
@@ -76,6 +76,9 @@ public class DirUtil {
                 OS.rmdir(new File(out, fileName));
                 in.getDir(fileName).copyToDir(new File(out, fileName));
             } else {
+                if (fileName.equals("res") && !in.containsFile(fileName)) {
+                    return;
+                }
                 File outFile = new File(out, fileName);
                 outFile.getParentFile().mkdirs();
                 BrutIO.copyAndClose(in.getFileInput(fileName),

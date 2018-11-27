@@ -1,5 +1,6 @@
 /**
- *  Copyright 2011 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,11 +14,12 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package brut.androlib.res.decoder;
 
 import brut.androlib.AndrolibException;
+import brut.androlib.err.UndefinedResObject;
 import brut.androlib.res.data.ResPackage;
+import brut.androlib.res.data.ResResSpec;
 import brut.androlib.res.data.value.ResAttr;
 import brut.androlib.res.data.value.ResScalarValue;
 
@@ -31,13 +33,32 @@ public class ResAttrDecoder {
                 type, value, rawValue);
 
         String decoded = null;
-        if (attrResId != 0) {
-            ResAttr attr = (ResAttr) getCurrentPackage().getResTable()
-                    .getResSpec(attrResId).getDefaultResource().getValue();
-            decoded = attr.convertToResXmlFormat(resValue);
+        if (attrResId > 0) {
+            try {
+                ResAttr attr = (ResAttr) getCurrentPackage().getResTable()
+                        .getResSpec(attrResId).getDefaultResource().getValue();
+
+                decoded = attr.convertToResXmlFormat(resValue);
+            } catch (UndefinedResObject | ClassCastException ex) {
+                // ignored
+            }
         }
 
         return decoded != null ? decoded : resValue.encodeAsResXmlAttr();
+    }
+
+    public String decodeManifestAttr(int attrResId)
+        throws AndrolibException {
+
+        if (attrResId != 0) {
+            ResResSpec resResSpec = getCurrentPackage().getResTable().getResSpec(attrResId);
+
+            if (resResSpec != null) {
+                return resResSpec.getName();
+            }
+        }
+
+        return null;
     }
 
     public ResPackage getCurrentPackage() throws AndrolibException {

@@ -1,5 +1,6 @@
 /**
- *  Copyright 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,12 +14,15 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package brut.util;
 
 import brut.common.BrutException;
 import java.io.*;
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 import org.apache.commons.io.IOUtils;
 
@@ -26,6 +30,9 @@ import org.apache.commons.io.IOUtils;
  * @author Ryszard Wiśniewski <brut.alll@gmail.com>
  */
 public class OS {
+
+    private static final Logger LOGGER = Logger.getLogger("");
+
     public static void rmdir(File dir) throws BrutException {
         if (! dir.exists()) {
             return;
@@ -80,27 +87,49 @@ public class OS {
 
     public static void exec(String[] cmd) throws BrutException {
         Process ps = null;
+        int exitValue = -99;
         try {
-            ps = Runtime.getRuntime().exec(cmd);
-
-            new StreamForwarder(ps.getInputStream(), System.err).start();
-            new StreamForwarder(ps.getErrorStream(), System.err).start();
-            if (ps.waitFor() != 0) {
-                throw new BrutException(
-                    "could not exec command: " + Arrays.toString(cmd));
-            }
+            ProcessBuilder builder = new ProcessBuilder(cmd);
+            ps = builder.start();
+            new StreamForwarder(ps.getErrorStream(), "ERROR").start();
+            new StreamForwarder(ps.getInputStream(), "OUTPUT").start();
+            exitValue = ps.waitFor();
+            if (exitValue != 0)
+                throw new BrutException("could not exec (exit code = " + exitValue + "): " + Arrays.toString(cmd));
         } catch (IOException ex) {
-            throw new BrutException(
-                "could not exec command: " + Arrays.toString(cmd), ex);
+            throw new BrutException("could not exec: " + Arrays.toString(cmd), ex);
         } catch (InterruptedException ex) {
-            throw new BrutException(
-                "could not exec command: " + Arrays.toString(cmd), ex);
+            throw new BrutException("could not exec : " + Arrays.toString(cmd), ex);
+        }
+    }
+
+    public static String execAndReturn(String[] cmd) {
+        ExecutorService executor = Executors.newCachedThreadPool();
+        try {
+            ProcessBuilder builder = new ProcessBuilder(cmd);
+            builder.redirectErrorStream(true);
+
+            Process process = builder.start();
+            StreamCollector collector = new StreamCollector(process.getInputStream());
+            executor.execute(collector);
+
+            process.waitFor();
+            if (! executor.awaitTermination(15, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+                if (! executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    System.err.println("Stream collector did not terminate.");
+                }
+            }
+            return collector.get();
+        } catch (IOException | InterruptedException e) {
+            return null;
         }
     }
 
     public static File createTempDirectory() throws BrutException {
         try {
             File tmp = File.createTempFile("BRUT", null);
+            tmp.deleteOnExit();
             if (!tmp.delete()) {
                 throw new BrutException("Could not delete tmp file: " + tmp.getAbsolutePath());
             }
@@ -115,30 +144,53 @@ public class OS {
 
     static class StreamForwarder extends Thread {
 
-        public StreamForwarder(InputStream in, OutputStream out) {
-            mIn = in;
-            mOut = out;
+        StreamForwarder(InputStream is, String type) {
+            mIn = is;
+            mType = type;
         }
 
         @Override
         public void run() {
             try {
-                BufferedReader in = new BufferedReader(
-                    new InputStreamReader(mIn));
-                BufferedWriter out = new BufferedWriter(
-                    new OutputStreamWriter(mOut));
+                BufferedReader br = new BufferedReader(new InputStreamReader(mIn));
                 String line;
-                while ((line = in.readLine()) != null) {
-                    out.write(line);
-                    out.newLine();
+                while ((line = br.readLine()) != null) {
+                    if (mType.equals("OUTPUT")) {
+                        LOGGER.info(line);
+                    } else {
+                        LOGGER.warning(line);
+                    }
                 }
-                out.flush();
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
         }
 
         private final InputStream mIn;
-        private final OutputStream mOut;
+        private final String mType;
+    }
+
+    static class StreamCollector implements Runnable {
+        private final StringBuffer buffer = new StringBuffer();
+        private final InputStream inputStream;
+
+        public StreamCollector(InputStream inputStream) {
+            super();
+            this.inputStream = inputStream;
+        }
+
+        @Override
+        public void run() {
+            String line;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+                while ((line = reader.readLine()) != null) {
+                    buffer.append(line).append('\n');
+                }
+            } catch (IOException ignored) {}
+        }
+
+        public String get() {
+            return buffer.toString();
+        }
     }
 }

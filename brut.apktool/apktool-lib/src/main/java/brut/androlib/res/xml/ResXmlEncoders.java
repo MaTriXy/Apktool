@@ -1,5 +1,6 @@
 /**
- *  Copyright 2011 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,7 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package brut.androlib.res.xml;
 
 import brut.util.Duo;
@@ -22,17 +22,19 @@ import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
+
 /**
  * @author Ryszard Wiśniewski <brut.alll@gmail.com>
  */
 public final class ResXmlEncoders {
 
     public static String escapeXmlChars(String str) {
-        return str.replace("&", "&amp;").replace("<", "&lt;");
+        return StringUtils.replace(StringUtils.replace(str, "&", "&amp;"), "<", "&lt;");
     }
 
     public static String encodeAsResXmlAttr(String str) {
-        if (str.isEmpty()) {
+        if (str == null || str.isEmpty()) {
             return str;
         }
 
@@ -70,7 +72,7 @@ public final class ResXmlEncoders {
     }
 
     public static String encodeAsXmlValue(String str) {
-        if (str.isEmpty()) {
+        if (str == null || str.isEmpty()) {
             return str;
         }
 
@@ -141,12 +143,12 @@ public final class ResXmlEncoders {
     }
 
     public static boolean hasMultipleNonPositionalSubstitutions(String str) {
-        Duo<List<Integer>, List<Integer>> tuple = findSubstitutions(str, 2);
+        Duo<List<Integer>, List<Integer>> tuple = findSubstitutions(str, 4);
         return ! tuple.m1.isEmpty() && tuple.m1.size() + tuple.m2.size() > 1;
     }
 
     public static String enumerateNonPositionalSubstitutionsIfRequired(String str) {
-        Duo<List<Integer>, List<Integer>> tuple = findSubstitutions(str, 2);
+        Duo<List<Integer>, List<Integer>> tuple = findSubstitutions(str, 4);
         if (tuple.m1.isEmpty() || tuple.m1.size() + tuple.m2.size() < 2) {
             return str;
         }
@@ -175,9 +177,15 @@ public final class ResXmlEncoders {
         }
         int pos;
         int pos2 = 0;
-        int length = str.length();
         List<Integer> nonPositional = new ArrayList<>();
         List<Integer> positional = new ArrayList<>();
+
+        if (str == null) {
+            return new Duo<>(nonPositional, positional);
+        }
+
+        int length = str.length();
+
         while ((pos = str.indexOf('%', pos2)) != -1) {
             pos2 = pos + 1;
             if (pos2 == length) {

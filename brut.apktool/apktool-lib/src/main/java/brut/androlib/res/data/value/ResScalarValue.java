@@ -1,5 +1,6 @@
 /**
- *  Copyright 2011 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,7 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package brut.androlib.res.data.value;
 
 import brut.androlib.AndrolibException;
@@ -27,12 +27,13 @@ import org.xmlpull.v1.XmlSerializer;
 /**
  * @author Ryszard Wiśniewski <brut.alll@gmail.com>
  */
-public abstract class ResScalarValue extends ResValue implements
+public abstract class ResScalarValue extends ResIntBasedValue implements
         ResXmlEncodable, ResValuesXmlSerializable {
     protected final String mType;
     protected final String mRawValue;
 
-    protected ResScalarValue(String type, String rawValue) {
+    protected ResScalarValue(String type, int rawIntValue, String rawValue) {
+        super(rawIntValue);
         mType = type;
         mRawValue = rawValue;
     }
@@ -59,6 +60,10 @@ public abstract class ResScalarValue extends ResValue implements
 
     public String encodeAsResXmlNonEscapedItemValue() throws AndrolibException {
         return encodeAsResXmlValue().replace("&amp;", "&").replace("&lt;","<");
+    }
+
+    public boolean hasMultipleNonPositionalSubstitutions() throws AndrolibException {
+        return ResXmlEncoders.hasMultipleNonPositionalSubstitutions(mRawValue);
     }
 
     @Override

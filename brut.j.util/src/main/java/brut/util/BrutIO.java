@@ -1,5 +1,6 @@
 /**
- *  Copyright 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,10 +14,18 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package brut.util;
 
 import java.io.*;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
+
+import brut.common.BrutException;
+import brut.common.InvalidUnknownFileException;
+import brut.common.RootUnknownFileException;
+import brut.common.TraversalUnknownFileException;
 import org.apache.commons.io.IOUtils;
 
 /**
@@ -28,10 +37,8 @@ public class BrutIO {
         try {
             IOUtils.copy(in, out);
         } finally {
-            try {
-                in.close();
-                out.close();
-            } catch (IOException ex) {}
+            IOUtils.closeQuietly(in);
+            IOUtils.closeQuietly(out);
         }
     }
 
@@ -59,4 +66,61 @@ public class BrutIO {
         }
         return modified;
     }
+
+    public static CRC32 calculateCrc(InputStream input) throws IOException {
+        CRC32 crc = new CRC32();
+        int bytesRead;
+        byte[] buffer = new byte[8192];
+        while((bytesRead = input.read(buffer)) != -1) {
+            crc.update(buffer, 0, bytesRead);
+        }
+        return crc;
+    }
+
+    public static String sanitizeUnknownFile(final File directory, final String entry) throws IOException, BrutException {
+        if (entry.length() == 0) {
+            throw new InvalidUnknownFileException("Invalid Unknown File - " + entry);
+        }
+
+        if (new File(entry).isAbsolute()) {
+            throw new RootUnknownFileException("Absolute Unknown Files is not allowed - " + entry);
+        }
+
+        final String canonicalDirPath = directory.getCanonicalPath() + File.separator;
+        final String canonicalEntryPath = new File(directory, entry).getCanonicalPath();
+
+        if (!canonicalEntryPath.startsWith(canonicalDirPath)) {
+            throw new TraversalUnknownFileException("Directory Traversal is not allowed - " + entry);
+        }
+
+        // https://stackoverflow.com/q/2375903/455008
+        return canonicalEntryPath.substring(canonicalDirPath.length());
+    }
+
+    public static String normalizePath(String path) {
+        char separator = File.separatorChar;
+
+        if (separator != '/') {
+            return path.replace(separator, '/');
+        }
+
+        return path;
+    }
+
+    public static void copy(File inputFile, ZipOutputStream outputFile) throws IOException {
+        try (
+                FileInputStream fis = new FileInputStream(inputFile)
+        ) {
+            IOUtils.copy(fis, outputFile);
+        }
+    }
+
+    public static void copy(ZipFile inputFile, ZipOutputStream outputFile, ZipEntry entry) throws IOException {
+        try (
+                InputStream is = inputFile.getInputStream(entry)
+        ) {
+            IOUtils.copy(is, outputFile);
+        }
+    }
+
 }

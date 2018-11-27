@@ -1,5 +1,6 @@
 /**
- *  Copyright 2011 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,7 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package brut.androlib.res.data;
 
 /**
@@ -31,11 +31,11 @@ public class ResID {
     }
 
     public ResID(int id) {
-        this(id >> 24, (id >> 16) & 0x000000ff, id & 0x0000ffff, id);
+        this((id >> 24) & 0xff, (id >> 16) & 0x000000ff, id & 0x0000ffff, id);
     }
 
     public ResID(int package_, int type, int entry, int id) {
-        this.package_ = package_;
+        this.package_ = (package_ == 0) ? 2 : package_;
         this.type = type;
         this.entry = entry;
         this.id = id;

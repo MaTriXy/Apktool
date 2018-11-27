@@ -1,5 +1,6 @@
 /**
- *  Copyright 2011 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,9 +19,11 @@ package brut.androlib.res.decoder;
 import android.content.res.XmlResourceParser;
 import android.util.TypedValue;
 import brut.androlib.AndrolibException;
+import brut.androlib.res.data.ResID;
 import brut.androlib.res.xml.ResXmlEncoders;
 import brut.util.ExtDataInput;
-import com.mindprod.ledatastream.LEDataInputStream;
+import com.google.common.io.LittleEndianDataInputStream;
+import java.io.DataInput;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -69,7 +72,10 @@ public class AXmlResourceParser implements XmlResourceParser {
     public void open(InputStream stream) {
         close();
         if (stream != null) {
-            m_reader = new ExtDataInput(new LEDataInputStream(stream));
+            // We need to explicitly cast to DataInput as otherwise the constructor is ambiguous.
+            // We choose DataInput instead of InputStream as ExtDataInput wraps an InputStream in
+            // a DataInputStream which is big-endian and ignores the little-endian behavior.
+            m_reader = new ExtDataInput((DataInput) new LittleEndianDataInputStream(stream));
         }
     }
 
@@ -282,7 +288,32 @@ public class AXmlResourceParser implements XmlResourceParser {
         if (namespace == -1) {
             return "";
         }
-        return m_strings.getString(namespace);
+
+        // Minifiers like removing the namespace, so we will default to default namespace
+        // unless the pkgId of the resource is private. We will grab the non-standard one.
+        String value = m_strings.getString(namespace);
+
+        if (value.length() == 0) {
+            ResID resourceId = new ResID(getAttributeNameResource(index));
+            if (resourceId.package_ == PRIVATE_PKG_ID) {
+                value = getNonDefaultNamespaceUri();
+            } else {
+                value = android_ns;
+            }
+        }
+
+        return value;
+    }
+
+    private String getNonDefaultNamespaceUri() {
+        int offset = m_namespaces.getCurrentCount() + 1;
+        String prefix = m_strings.getString(m_namespaces.get(offset, true));
+
+        if (! prefix.equalsIgnoreCase("android")) {
+            return  m_strings.getString(m_namespaces.get(offset, false));
+        }
+
+        return android_ns;
     }
 
     @Override
@@ -303,7 +334,21 @@ public class AXmlResourceParser implements XmlResourceParser {
         if (name == -1) {
             return "";
         }
-        return m_strings.getString(name);
+
+        String value = m_strings.getString(name);
+
+        // some attributes will return "", we must rely on the resource_id and refer to the frameworks
+        // to match the resource id to the name. ex: 0x101021C = versionName
+        if (value.length() != 0) {
+            return value;
+        } else {
+            try {
+                value = mAttrDecoder.decodeManifestAttr(getAttributeNameResource(index));
+            } catch (AndrolibException e) {
+                value = "";
+            }
+            return value;
+        }
     }
 
     @Override
@@ -941,6 +986,7 @@ public class AXmlResourceParser implements XmlResourceParser {
     private StringBlock m_strings;
     private int[] m_resourceIDs;
     private NamespaceStack m_namespaces = new NamespaceStack();
+    private String android_ns = "http://schemas.android.com/apk/res/android";
     private boolean m_decreaseDepth;
     private int m_event;
     private int m_lineNumber;
@@ -964,4 +1010,6 @@ public class AXmlResourceParser implements XmlResourceParser {
             CHUNK_XML_END_NAMESPACE = 0x00100101,
             CHUNK_XML_START_TAG = 0x00100102, CHUNK_XML_END_TAG = 0x00100103,
             CHUNK_XML_TEXT = 0x00100104, CHUNK_XML_LAST = 0x00100104;
+
+    private static final int PRIVATE_PKG_ID = 0x7F;
 }
