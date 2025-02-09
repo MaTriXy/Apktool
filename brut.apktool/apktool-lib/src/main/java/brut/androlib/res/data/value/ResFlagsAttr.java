@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,32 +16,39 @@
  */
 package brut.androlib.res.data.value;
 
-import brut.androlib.AndrolibException;
+import brut.androlib.Config;
+import brut.androlib.exceptions.AndrolibException;
+import brut.androlib.res.data.ResResSpec;
 import brut.androlib.res.data.ResResource;
-import brut.util.Duo;
+import brut.androlib.res.data.arsc.FlagItem;
+import org.apache.commons.lang3.tuple.Pair;
+import org.xmlpull.v1.XmlSerializer;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
-import org.xmlpull.v1.XmlSerializer;
+import java.util.logging.Logger;
 
-/**
- * @author Ryszard Wiśniewski <brut.alll@gmail.com>
- */
 public class ResFlagsAttr extends ResAttr {
-    ResFlagsAttr(ResReferenceValue parent, int type, Integer min, Integer max,
-                 Boolean l10n, Duo<ResReferenceValue, ResIntValue>[] items) {
-        super(parent, type, min, max, l10n);
+    private static final Logger LOGGER = Logger.getLogger(ResFlagsAttr.class.getName());
 
+    private final FlagItem[] mItems;
+    private FlagItem[] mZeroFlags;
+    private FlagItem[] mFlags;
+
+    ResFlagsAttr(ResReferenceValue parent, int type, Integer min, Integer max, Boolean l10n,
+                 Pair<ResReferenceValue, ResScalarValue>[] items) {
+        super(parent, type, min, max, l10n);
         mItems = new FlagItem[items.length];
         for (int i = 0; i < items.length; i++) {
-            mItems[i] = new FlagItem(items[i].m1, items[i].m2.getValue());
+            Pair<ResReferenceValue, ResScalarValue> item = items[i];
+            mItems[i] = new FlagItem(item.getLeft(), item.getRight().getRawIntValue());
         }
     }
 
     @Override
-    public String convertToResXmlFormat(ResScalarValue value)
-            throws AndrolibException {
-        if(value instanceof ResReferenceValue) {
+    public String convertToResXmlFormat(ResScalarValue value) throws AndrolibException {
+        if (value instanceof ResReferenceValue) {
             return value.encodeAsResXml();
         }
         if (!(value instanceof ResIntValue)) {
@@ -57,8 +64,7 @@ public class ResFlagsAttr extends ResAttr {
         FlagItem[] flagItems = new FlagItem[mFlags.length];
         int[] flags = new int[mFlags.length];
         int flagsCount = 0;
-        for (int i = 0; i < mFlags.length; i++) {
-            FlagItem flagItem = mFlags[i];
+        for (FlagItem flagItem : mFlags) {
             int flag = flagItem.flag;
 
             if ((intVal & flag) != flag) {
@@ -76,20 +82,25 @@ public class ResFlagsAttr extends ResAttr {
     @Override
     protected void serializeBody(XmlSerializer serializer, ResResource res)
             throws AndrolibException, IOException {
-        for (int i = 0; i < mItems.length; i++) {
-            FlagItem item = mItems[i];
+        for (FlagItem item : mItems) {
+            ResResSpec referent = item.ref.getReferent();
+
+            // #2836 - Support skipping items if the resource cannot be identified.
+            if (referent == null && mConfig.getDecodeResolveMode() == Config.DECODE_RES_RESOLVE_REMOVE) {
+                LOGGER.fine(String.format("null flag reference: 0x%08x(%s)", item.ref.getValue(), item.ref.getType()));
+                continue;
+            }
 
             serializer.startTag(null, "flag");
             serializer.attribute(null, "name", item.getValue());
-            serializer.attribute(null, "value",
-                    String.format("0x%08x", item.flag));
+            serializer.attribute(null, "value", String.format("0x%08x", item.flag));
             serializer.endTag(null, "flag");
         }
     }
 
     private boolean isSubpartOf(int flag, int[] flags) {
-        for (int i = 0; i < flags.length; i++) {
-            if ((flags[i] & flag) == flag) {
+        for (int f : flags) {
+            if ((f & flag) == flag) {
                 return true;
             }
         }
@@ -97,14 +108,14 @@ public class ResFlagsAttr extends ResAttr {
     }
 
     private String renderFlags(FlagItem[] flags) throws AndrolibException {
-        String ret = "";
-        for (int i = 0; i < flags.length; i++) {
-            ret += "|" + flags[i].getValue();
+        StringBuilder sb = new StringBuilder();
+        for (FlagItem flag : flags) {
+            sb.append("|").append(flag.getValue());
         }
-        if (ret.isEmpty()) {
-            return ret;
+        if (sb.length() == 0) {
+            return sb.toString();
         }
-        return ret.substring(1);
+        return sb.substring(1);
     }
 
     private void loadFlags() {
@@ -117,8 +128,7 @@ public class ResFlagsAttr extends ResAttr {
         FlagItem[] flags = new FlagItem[mItems.length];
         int flagsCount = 0;
 
-        for (int i = 0; i < mItems.length; i++) {
-            FlagItem item = mItems[i];
+        for (FlagItem item : mItems) {
             if (item.flag == 0) {
                 zeroFlags[zeroFlagsCount++] = item;
             } else {
@@ -129,35 +139,6 @@ public class ResFlagsAttr extends ResAttr {
         mZeroFlags = Arrays.copyOf(zeroFlags, zeroFlagsCount);
         mFlags = Arrays.copyOf(flags, flagsCount);
 
-        Arrays.sort(mFlags, new Comparator<FlagItem>() {
-            @Override
-            public int compare(FlagItem o1, FlagItem o2) {
-                return Integer.valueOf(Integer.bitCount(o2.flag)).compareTo(
-                        Integer.bitCount(o1.flag));
-            }
-        });
-    }
-
-    private final FlagItem[] mItems;
-
-    private FlagItem[] mZeroFlags;
-    private FlagItem[] mFlags;
-
-    private static class FlagItem {
-        public final ResReferenceValue ref;
-        public final int flag;
-        public String value;
-
-        public FlagItem(ResReferenceValue ref, int flag) {
-            this.ref = ref;
-            this.flag = flag;
-        }
-
-        public String getValue() throws AndrolibException {
-            if (value == null) {
-                value = ref.getReferent().getName();
-            }
-            return value;
-        }
+        Arrays.sort(mFlags, Comparator.comparingInt((FlagItem item) -> Integer.bitCount(item.flag)).reversed());
     }
 }

@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,29 +16,26 @@
  */
 package brut.androlib.res.data;
 
-import brut.androlib.AndrolibException;
-import brut.androlib.err.UndefinedResObject;
+import brut.androlib.exceptions.AndrolibException;
+import brut.androlib.exceptions.UndefinedResObjectException;
 import java.util.*;
 
-/**
- * @author Ryszard Wiśniewski <brut.alll@gmail.com>
- */
 public final class ResTypeSpec {
+    public static final String RES_TYPE_NAME_ARRAY = "array";
+    public static final String RES_TYPE_NAME_ATTR = "attr";
+    public static final String RES_TYPE_NAME_ATTR_PRIVATE = "^attr-private";
+    public static final String RES_TYPE_NAME_PLURALS = "plurals";
+    public static final String RES_TYPE_NAME_STRING = "string";
+    public static final String RES_TYPE_NAME_STYLES = "style";
+
     private final String mName;
-    private final Map<String, ResResSpec> mResSpecs = new LinkedHashMap<String, ResResSpec>();
-
-    private final ResTable mResTable;
-    private final ResPackage mPackage;
-
     private final int mId;
-    private final int mEntryCount;
+    private final Map<String, ResResSpec> mResSpecs;
 
-    public ResTypeSpec(String name, ResTable resTable, ResPackage package_, int id, int entryCount) {
-        this.mName = name;
-        this.mResTable = resTable;
-        this.mPackage = package_;
-        this.mId = id;
-        this.mEntryCount = entryCount;
+    public ResTypeSpec(String name, int id) {
+        mName = name;
+        mId = id;
+        mResSpecs = new LinkedHashMap<>();
     }
 
     public String getName() {
@@ -49,32 +46,20 @@ public final class ResTypeSpec {
         return mId;
     }
 
-    public int getEntryCount() {
-        return mEntryCount;
-    }
-
     public boolean isString() {
-        return mName.equalsIgnoreCase("string");
-    }
-
-    public Set<ResResSpec> listResSpecs() {
-        return new LinkedHashSet<ResResSpec>(mResSpecs.values());
+        return mName.equals(RES_TYPE_NAME_STRING);
     }
 
     public ResResSpec getResSpec(String name) throws AndrolibException {
         ResResSpec spec = getResSpecUnsafe(name);
         if (spec == null) {
-            throw new UndefinedResObject(String.format("resource spec: %s/%s", getName(), name));
+            throw new UndefinedResObjectException(String.format("resource spec: %s/%s", getName(), name));
         }
         return spec;
     }
 
     public ResResSpec getResSpecUnsafe(String name) {
         return mResSpecs.get(name);
-    }
-
-    public void removeResSpec(ResResSpec spec) throws AndrolibException {
-        mResSpecs.remove(spec.getName());
     }
 
     public void addResSpec(ResResSpec spec) throws AndrolibException {

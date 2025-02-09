@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,42 +18,42 @@ package brut.androlib.decode;
 
 import brut.androlib.ApkDecoder;
 import brut.androlib.BaseTest;
+import brut.androlib.Config;
 import brut.androlib.TestUtils;
 import brut.directory.ExtFile;
 import brut.common.BrutException;
-import brut.util.OS;
+
 import java.io.File;
-import java.io.IOException;
 
 import org.junit.*;
 import static org.junit.Assert.*;
 
 public class AndResGuardTest extends BaseTest {
+    private static final String TEST_APK = "issue1170.apk";
 
     @BeforeClass
     public static void beforeClass() throws Exception {
-        TestUtils.cleanFrameworkFile();
-        sTmpDir = new ExtFile(OS.createTempDirectory());
-        TestUtils.copyResourceDir(AndResGuardTest.class, "decode/issue1170/", sTmpDir);
-    }
-
-    @AfterClass
-    public static void afterClass() throws BrutException {
-        OS.rmdir(sTmpDir);
+        TestUtils.copyResourceDir(AndResGuardTest.class, "decode/issue1170", sTmpDir);
     }
 
     @Test
-    public void checkifAndResDecodeRemapsRFolder() throws BrutException, IOException {
-        String apk = "issue1170.apk";
+    public void checkifAndResDecodeRemapsRFolder() throws BrutException {
+        ExtFile testApk = new ExtFile(sTmpDir, TEST_APK);
+        ExtFile testDir = new ExtFile(testApk + ".out");
+        new ApkDecoder(testApk, sConfig).decode(testDir);
 
-        // decode issue1170.apk
-        ApkDecoder apkDecoder = new ApkDecoder(new File(sTmpDir + File.separator + apk));
-        sTestOrigDir = new ExtFile(sTmpDir + File.separator + apk + ".out");
+        assertTrue(new File(testDir, "res/mipmap-hdpi-v4/a.png").isFile());
+    }
 
-        apkDecoder.setOutDir(new File(sTmpDir + File.separator + apk + ".out"));
-        apkDecoder.decode();
+    @Test
+    public void checkIfAndResDecodeRemapsRFolderInRawMode() throws BrutException {
+        sConfig.setForceDelete(true);
+        sConfig.setDecodeResources(Config.DECODE_RESOURCES_NONE);
 
-        File aPng =  new File(sTestOrigDir,"res/mipmap-hdpi-v4/a.png");
-        assertTrue(aPng.isFile());
+        ExtFile testApk = new ExtFile(sTmpDir, TEST_APK);
+        ExtFile testDir = new ExtFile(testApk + ".raw.out");
+        new ApkDecoder(testApk, sConfig).decode(testDir);
+
+        assertTrue(new File(testDir, "r/a/a.png").isFile());
     }
 }

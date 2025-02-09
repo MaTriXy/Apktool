@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,15 @@
  */
 package brut.androlib.res.data.value;
 
-import brut.androlib.AndrolibException;
+import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.data.ResResource;
 import brut.androlib.res.xml.ResValuesXmlSerializable;
 import brut.androlib.res.xml.ResXmlEncodable;
 import brut.androlib.res.xml.ResXmlEncoders;
-import java.io.IOException;
 import org.xmlpull.v1.XmlSerializer;
 
-/**
- * @author Ryszard Wiśniewski <brut.alll@gmail.com>
- */
+import java.io.IOException;
+
 public abstract class ResScalarValue extends ResIntBasedValue implements
         ResXmlEncodable, ResValuesXmlSerializable {
     protected final String mType;
@@ -62,25 +60,37 @@ public abstract class ResScalarValue extends ResIntBasedValue implements
         return encodeAsResXmlValue().replace("&amp;", "&").replace("&lt;","<");
     }
 
-    public boolean hasMultipleNonPositionalSubstitutions() throws AndrolibException {
+    public boolean hasMultipleNonPositionalSubstitutions() {
         return ResXmlEncoders.hasMultipleNonPositionalSubstitutions(mRawValue);
     }
 
     @Override
-    public void serializeToResValuesXml(XmlSerializer serializer,
-                                        ResResource res) throws IOException, AndrolibException {
+    public void serializeToResValuesXml(XmlSerializer serializer, ResResource res)
+            throws AndrolibException, IOException {
         String type = res.getResSpec().getType().getName();
         boolean item = !"reference".equals(mType) && !type.equals(mType);
 
         String body = encodeAsResXmlValue();
 
         // check for resource reference
-        if (!type.equalsIgnoreCase("color")) {
+        if (!type.equals("color")) {
             if (body.contains("@")) {
                 if (!res.getFilePath().contains("string")) {
                     item = true;
                 }
             }
+        }
+
+        // Dummy attributes should be <item> with type attribute
+        if (res.getResSpec().isDummyResSpec()) {
+            item = true;
+        }
+
+        // Android does not allow values (false) for ids.xml anymore
+        // https://issuetracker.google.com/issues/80475496
+        // But it decodes as a ResBoolean, which makes no sense. So force it to empty
+        if (type.equals("id") && !body.isEmpty()) {
+            body = "";
         }
 
         // check for using attrib as node or item
@@ -105,8 +115,9 @@ public abstract class ResScalarValue extends ResIntBasedValue implements
         return mType;
     }
 
-    protected void serializeExtraXmlAttrs(XmlSerializer serializer,
-                                          ResResource res) throws IOException {
+    protected void serializeExtraXmlAttrs(XmlSerializer serializer, ResResource res)
+            throws IOException {
+        // stub
     }
 
     protected abstract String encodeAsResXml() throws AndrolibException;

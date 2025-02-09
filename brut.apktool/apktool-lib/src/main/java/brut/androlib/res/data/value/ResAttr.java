@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,35 +16,53 @@
  */
 package brut.androlib.res.data.value;
 
-import brut.androlib.AndrolibException;
+import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.data.ResPackage;
 import brut.androlib.res.data.ResResource;
 import brut.androlib.res.xml.ResValuesXmlSerializable;
-import brut.util.Duo;
-import java.io.IOException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.xmlpull.v1.XmlSerializer;
 
-/**
- * @author Ryszard Wiśniewski <brut.alll@gmail.com>
- */
+import java.io.IOException;
+
 public class ResAttr extends ResBagValue implements ResValuesXmlSerializable {
-    ResAttr(ResReferenceValue parentVal, int type, Integer min, Integer max,
-            Boolean l10n) {
-        super(parentVal);
+    private static final int BAG_KEY_ATTR_MIN = 0x01000001;
+    private static final int BAG_KEY_ATTR_MAX = 0x01000002;
+    private static final int BAG_KEY_ATTR_L10N = 0x01000003;
+
+    private static final int TYPE_REFERENCE = 0x01;
+    private static final int TYPE_STRING = 0x02;
+    private static final int TYPE_INT = 0x04;
+    private static final int TYPE_BOOL = 0x08;
+    private static final int TYPE_COLOR = 0x10;
+    private static final int TYPE_FLOAT = 0x20;
+    private static final int TYPE_DIMEN = 0x40;
+    private static final int TYPE_FRACTION = 0x80;
+    private static final int TYPE_ANY_STRING = 0xee;
+
+    private static final int TYPE_ENUM = 0x00010000;
+    private static final int TYPE_FLAGS = 0x00020000;
+
+    private final int mType;
+    private final Integer mMin;
+    private final Integer mMax;
+    private final Boolean mL10n;
+
+    ResAttr(ResReferenceValue parent, int type, Integer min, Integer max, Boolean l10n) {
+        super(parent);
         mType = type;
         mMin = min;
         mMax = max;
         mL10n = l10n;
     }
 
-    public String convertToResXmlFormat(ResScalarValue value)
-            throws AndrolibException {
+    public String convertToResXmlFormat(ResScalarValue value) throws AndrolibException {
         return null;
     }
 
     @Override
-    public void serializeToResValuesXml(XmlSerializer serializer,
-                                        ResResource res) throws IOException, AndrolibException {
+    public void serializeToResValuesXml(XmlSerializer serializer, ResResource res)
+            throws AndrolibException, IOException {
         String type = getTypeAsString();
 
         serializer.startTag(null, "attr");
@@ -65,50 +83,47 @@ public class ResAttr extends ResBagValue implements ResValuesXmlSerializable {
         serializer.endTag(null, "attr");
     }
 
-    public static ResAttr factory(ResReferenceValue parent,
-                                  Duo<Integer, ResScalarValue>[] items, ResValueFactory factory,
-                                  ResPackage pkg) throws AndrolibException {
-
-        int type = ((ResIntValue) items[0].m2).getValue();
-        int scalarType = type & 0xffff;
+    public static ResAttr factory(ResReferenceValue parent, Pair<Integer, ResScalarValue>[] items,
+                                  ResValueFactory factory) throws AndrolibException {
         Integer min = null, max = null;
         Boolean l10n = null;
-        int i;
-        for (i = 1; i < items.length; i++) {
-            switch (items[i].m1) {
+        int i = 1;
+        for (; i < items.length; i++) {
+            Pair<Integer, ResScalarValue> item = items[i];
+            switch (item.getLeft()) {
                 case BAG_KEY_ATTR_MIN:
-                    min = ((ResIntValue) items[i].m2).getValue();
+                    min = item.getRight().getRawIntValue();
                     continue;
                 case BAG_KEY_ATTR_MAX:
-                    max = ((ResIntValue) items[i].m2).getValue();
+                    max = item.getRight().getRawIntValue();
                     continue;
                 case BAG_KEY_ATTR_L10N:
-                    l10n = ((ResIntValue) items[i].m2).getValue() != 0;
+                    l10n = item.getRight().getRawIntValue() != 0;
                     continue;
             }
             break;
         }
 
+        // #2806 - Make sure we handle int-based values and not just ResIntValue
+        int rawValue = items[0].getRight().getRawIntValue();
+        int scalarType = rawValue & 0xffff;
+
         if (i == items.length) {
             return new ResAttr(parent, scalarType, min, max, l10n);
         }
-        Duo<ResReferenceValue, ResIntValue>[] attrItems = new Duo[items.length
-                - i];
-        int j = 0;
-        for (; i < items.length; i++) {
-            int resId = items[i].m1;
+        ResPackage pkg = parent.getPackage();
+        Pair<ResReferenceValue, ResScalarValue>[] attrItems = new Pair[items.length - i];
+        for (int j = 0; i < items.length; i++, j++) {
+            Pair<Integer, ResScalarValue> item = items[i];
+            int resId = item.getLeft();
             pkg.addSynthesizedRes(resId);
-            attrItems[j++] = new Duo<ResReferenceValue, ResIntValue>(
-                    factory.newReference(resId, null),
-                    (ResIntValue) items[i].m2);
+            attrItems[j] = Pair.of(factory.newReference(resId, null), item.getRight());
         }
-        switch (type & 0xff0000) {
+        switch (rawValue & 0xff0000) {
             case TYPE_ENUM:
-                return new ResEnumAttr(parent, scalarType, min, max, l10n,
-                        attrItems);
+                return new ResEnumAttr(parent, scalarType, min, max, l10n, attrItems);
             case TYPE_FLAGS:
-                return new ResFlagsAttr(parent, scalarType, min, max, l10n,
-                        attrItems);
+                return new ResFlagsAttr(parent, scalarType, min, max, l10n, attrItems);
         }
 
         throw new AndrolibException("Could not decode attr value");
@@ -116,6 +131,7 @@ public class ResAttr extends ResBagValue implements ResValuesXmlSerializable {
 
     protected void serializeBody(XmlSerializer serializer, ResResource res)
             throws AndrolibException, IOException {
+        // stub
     }
 
     protected String getTypeAsString() {
@@ -149,27 +165,4 @@ public class ResAttr extends ResBagValue implements ResValuesXmlSerializable {
         }
         return s.substring(1);
     }
-
-    private final int mType;
-    private final Integer mMin;
-    private final Integer mMax;
-    private final Boolean mL10n;
-
-    public static final int BAG_KEY_ATTR_TYPE = 0x01000000;
-    private static final int BAG_KEY_ATTR_MIN = 0x01000001;
-    private static final int BAG_KEY_ATTR_MAX = 0x01000002;
-    private static final int BAG_KEY_ATTR_L10N = 0x01000003;
-
-    private final static int TYPE_REFERENCE = 0x01;
-    private final static int TYPE_STRING = 0x02;
-    private final static int TYPE_INT = 0x04;
-    private final static int TYPE_BOOL = 0x08;
-    private final static int TYPE_COLOR = 0x10;
-    private final static int TYPE_FLOAT = 0x20;
-    private final static int TYPE_DIMEN = 0x40;
-    private final static int TYPE_FRACTION = 0x80;
-    private final static int TYPE_ANY_STRING = 0xee;
-
-    private static final int TYPE_ENUM = 0x00010000;
-    private static final int TYPE_FLAGS = 0x00020000;
 }

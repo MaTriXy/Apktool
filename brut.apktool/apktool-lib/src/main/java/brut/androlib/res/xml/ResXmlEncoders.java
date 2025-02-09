@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,18 +16,18 @@
  */
 package brut.androlib.res.xml;
 
-import brut.util.Duo;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
-
-/**
- * @author Ryszard Wiśniewski <brut.alll@gmail.com>
- */
 public final class ResXmlEncoders {
+
+    private ResXmlEncoders() {
+        // Private constructor for utility class
+    }
 
     public static String escapeXmlChars(String str) {
         return StringUtils.replace(StringUtils.replace(str, "&", "&amp;"), "<", "&lt;");
@@ -106,14 +106,12 @@ public final class ResXmlEncoders {
                 wasSpace = false;
                 switch (c) {
                     case '\\':
+                    case '"':
                         out.append('\\');
                         break;
                     case '\'':
                     case '\n':
                         enclose = true;
-                        break;
-                    case '"':
-                        out.append('\\');
                         break;
                     case '<':
                         isInStyleTag = true;
@@ -124,7 +122,7 @@ public final class ResXmlEncoders {
                     default:
                         if (!isPrintableChar(c)) {
 
-                            // lets not write trailing \u0000 if we are at end of string
+                            // let's not write trailing \u0000 if we are at end of string
                             if ((out.length() + 1) == str.length() && c == '\u0000') {
                                 continue;
                             }
@@ -143,23 +141,26 @@ public final class ResXmlEncoders {
     }
 
     public static boolean hasMultipleNonPositionalSubstitutions(String str) {
-        Duo<List<Integer>, List<Integer>> tuple = findSubstitutions(str, 4);
-        return ! tuple.m1.isEmpty() && tuple.m1.size() + tuple.m2.size() > 1;
+        Pair<List<Integer>, List<Integer>> subs = findSubstitutions(str, 4);
+        List<Integer> nonPositional = subs.getLeft();
+        List<Integer> positional = subs.getRight();
+        return !nonPositional.isEmpty() && nonPositional.size() + positional.size() > 1;
     }
 
     public static String enumerateNonPositionalSubstitutionsIfRequired(String str) {
-        Duo<List<Integer>, List<Integer>> tuple = findSubstitutions(str, 4);
-        if (tuple.m1.isEmpty() || tuple.m1.size() + tuple.m2.size() < 2) {
+        Pair<List<Integer>, List<Integer>> subs = findSubstitutions(str, 4);
+        List<Integer> nonPositional = subs.getLeft();
+        List<Integer> positional = subs.getRight();
+        if (nonPositional.isEmpty() || nonPositional.size() + positional.size() < 2) {
             return str;
         }
-        List<Integer> subs = tuple.m1;
 
         StringBuilder out = new StringBuilder();
         int pos = 0;
         int count = 0;
-        for (Integer sub : subs) {
-            out.append(str.substring(pos, ++sub)).append(++count).append('$');
-            pos = sub;
+        for (int pos2 : nonPositional) {
+            out.append(str, pos, ++pos2).append(++count).append('$');
+            pos = pos2;
         }
         out.append(str.substring(pos));
 
@@ -167,11 +168,11 @@ public final class ResXmlEncoders {
     }
 
     /**
-     * It returns a tuple of:
-     *   - a list of offsets of non positional substitutions. non-pos is defined as any "%" which isn't "%%" nor "%\d+\$"
+     * It returns a pair of:
+     *   - a list of offsets of non-positional substitutions. non-pos is defined as any "%" which isn't "%%" nor "%\d+\$"
      *   - a list of offsets of positional substitutions
      */
-    private static Duo<List<Integer>, List<Integer>> findSubstitutions(String str, int nonPosMax) {
+    private static Pair<List<Integer>, List<Integer>> findSubstitutions(String str, int nonPosMax) {
         if (nonPosMax == -1) {
             nonPosMax = Integer.MAX_VALUE;
         }
@@ -181,7 +182,7 @@ public final class ResXmlEncoders {
         List<Integer> positional = new ArrayList<>();
 
         if (str == null) {
-            return new Duo<>(nonPositional, positional);
+            return Pair.of(nonPositional, positional);
         }
 
         int length = str.length();
@@ -210,7 +211,7 @@ public final class ResXmlEncoders {
             }
         }
 
-        return new Duo<>(nonPositional, positional);
+        return Pair.of(nonPositional, positional);
     }
 
     private static boolean isPrintableChar(char c) {

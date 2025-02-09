@@ -1,6 +1,7 @@
 # Gradle
 .gradle/
 bin/
+gradle.properties
 
 # Build
 **/build/
@@ -20,7 +21,7 @@ bin/
 # IntelliJ
 *.iml
 .idea/*
-/out
+**/out/
 
 # Patches
 *.patch

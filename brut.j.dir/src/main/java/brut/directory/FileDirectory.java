@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,15 +16,20 @@
  */
 package brut.directory;
 
+import brut.util.OS;
+
 import java.io.*;
 import java.net.URLDecoder;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 
 public class FileDirectory extends AbstractDirectory {
-    private File mDir;
+    private final File mDir;
 
-    public FileDirectory(ExtFile dir, String folder) throws DirectoryException, UnsupportedEncodingException {
+    public FileDirectory(ExtFile dir, String folder) throws DirectoryException {
         this(new File(dir.toString().replaceAll("%20", " "), folder));
     }
 
@@ -33,51 +38,50 @@ public class FileDirectory extends AbstractDirectory {
     }
 
     public FileDirectory(File dir) throws DirectoryException {
-        super();
-        if (! dir.isDirectory()) {
+        if (!dir.isDirectory()) {
             throw new DirectoryException("file must be a directory: " + dir);
         }
         mDir = dir;
     }
 
     @Override
-    public long getSize(String fileName)
-            throws DirectoryException {
+    public long getSize(String fileName) throws DirectoryException {
         File file = new File(generatePath(fileName));
-        if (! file.isFile()) {
+        if (!file.isFile()) {
             throw new DirectoryException("file must be a file: " + file);
         }
         return file.length();
     }
 
     @Override
-    public long getCompressedSize(String fileName)
-            throws DirectoryException {
+    public long getCompressedSize(String fileName) throws DirectoryException {
         return getSize(fileName);
     }
 
     @Override
     protected AbstractDirectory createDirLocal(String name) throws DirectoryException {
         File dir = new File(generatePath(name));
-        dir.mkdir();
+        OS.mkdir(dir);
         return new FileDirectory(dir);
     }
 
     @Override
     protected InputStream getFileInputLocal(String name) throws DirectoryException {
         try {
-            return new FileInputStream(generatePath(name));
-        } catch (FileNotFoundException e) {
-            throw new DirectoryException(e);
+            File file = new File(generatePath(name));
+            return Files.newInputStream(file.toPath());
+        } catch (IOException ex) {
+            throw new DirectoryException(ex);
         }
     }
 
     @Override
     protected OutputStream getFileOutputLocal(String name) throws DirectoryException {
         try {
-            return new FileOutputStream(generatePath(name));
-        } catch (FileNotFoundException e) {
-            throw new DirectoryException(e);
+            File file = new File(generatePath(name));
+            return Files.newOutputStream(file.toPath());
+        } catch (IOException ex) {
+            throw new DirectoryException(ex);
         }
     }
 
@@ -93,7 +97,8 @@ public class FileDirectory extends AbstractDirectory {
 
     @Override
     protected void removeFileLocal(String name) {
-        new File(generatePath(name)).delete();
+        File file = new File(generatePath(name));
+        OS.rmfile(file);
     }
 
     private String generatePath(String name) {
@@ -101,24 +106,24 @@ public class FileDirectory extends AbstractDirectory {
     }
 
     private void loadAll() {
-        mFiles = new LinkedHashSet<String>();
-        mDirs = new LinkedHashMap<String, AbstractDirectory>();
+        mFiles = new LinkedHashSet<>();
+        mDirs = new LinkedHashMap<>();
 
         File[] files = getDir().listFiles();
-        for (int i = 0; i < files.length; i++) {
-            File file = files[i];
+        Arrays.sort(files, Comparator.comparing(File::getName));
+
+        for (File file : files) {
             if (file.isFile()) {
                 mFiles.add(file.getName());
             } else {
-                // IMPOSSIBLE_EXCEPTION
                 try {
                     mDirs.put(file.getName(), new FileDirectory(file));
-                } catch (DirectoryException e) {}
+                } catch (DirectoryException ignored) {}
             }
         }
     }
 
-    private File getDir() {
+    public File getDir() {
         return mDir;
     }
 }

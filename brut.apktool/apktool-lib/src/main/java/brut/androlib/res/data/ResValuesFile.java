@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,21 +17,20 @@
 package brut.androlib.res.data;
 
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 
-/**
- * @author Ryszard Wiśniewski <brut.alll@gmail.com>
- */
 public class ResValuesFile {
     private final ResPackage mPackage;
     private final ResTypeSpec mType;
     private final ResType mConfig;
-    private final Set<ResResource> mResources = new LinkedHashSet<ResResource>();
+    private final Set<ResResource> mResources;
 
     public ResValuesFile(ResPackage pkg, ResTypeSpec type, ResType config) {
-        this.mPackage = pkg;
-        this.mType = type;
-        this.mConfig = config;
+        mPackage = pkg;
+        mType = type;
+        mConfig = config;
+        mResources = new LinkedHashSet<>();
     }
 
     public String getPath() {
@@ -48,10 +47,6 @@ public class ResValuesFile {
         return mType;
     }
 
-    public ResType getConfig() {
-        return mConfig;
-    }
-
     public boolean isSynthesized(ResResource res) {
         return mPackage.isSynthesized(res.getResSpec().getId());
     }
@@ -62,27 +57,19 @@ public class ResValuesFile {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
+        if (obj == this) {
+            return true;
         }
-        if (getClass() != obj.getClass()) {
-            return false;
+        if (obj instanceof ResValuesFile) {
+            ResValuesFile other = (ResValuesFile) obj;
+            return Objects.equals(mType, other.mType)
+                    && Objects.equals(mConfig, other.mConfig);
         }
-        final ResValuesFile other = (ResValuesFile) obj;
-        if (this.mType != other.mType && (this.mType == null || !this.mType.equals(other.mType))) {
-            return false;
-        }
-        if (this.mConfig != other.mConfig && (this.mConfig == null || !this.mConfig.equals(other.mConfig))) {
-            return false;
-        }
-        return true;
+        return false;
     }
 
     @Override
     public int hashCode() {
-        int hash = 17;
-        hash = 31 * hash + (this.mType != null ? this.mType.hashCode() : 0);
-        hash = 31 * hash + (this.mConfig != null ? this.mConfig.hashCode() : 0);
-        return hash;
+        return Objects.hash(mType, mConfig);
     }
 }

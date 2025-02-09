@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,28 +16,26 @@
  */
 package brut.androlib.res.data.value;
 
-import brut.androlib.AndrolibException;
+import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.data.ResResource;
 import brut.androlib.res.xml.ResValuesXmlSerializable;
-import brut.util.Duo;
-import java.io.IOException;
-import java.util.Arrays;
-
+import com.google.common.collect.Sets;
+import org.apache.commons.lang3.tuple.Pair;
 import org.xmlpull.v1.XmlSerializer;
 
-/**
- * @author Ryszard Wiśniewski <brut.alll@gmail.com>
- */
-public class ResArrayValue extends ResBagValue implements
-        ResValuesXmlSerializable {
-    private String mRawItems;
+import java.io.IOException;
+import java.util.Set;
 
-    ResArrayValue(ResReferenceValue parent, Duo<Integer, ResScalarValue>[] items) {
+public class ResArrayValue extends ResBagValue implements ResValuesXmlSerializable {
+    private static final Set<String> ALLOWED_ARRAY_TYPES = Sets.newHashSet("string", "integer");
+
+    private final ResScalarValue[] mItems;
+
+    ResArrayValue(ResReferenceValue parent, Pair<Integer, ResScalarValue>[] items) {
         super(parent);
-
         mItems = new ResScalarValue[items.length];
         for (int i = 0; i < items.length; i++) {
-            mItems[i] = items[i].m2;
+            mItems[i] = items[i].getRight();
         }
     }
 
@@ -47,25 +45,25 @@ public class ResArrayValue extends ResBagValue implements
     }
 
     @Override
-    public void serializeToResValuesXml(XmlSerializer serializer,
-                                        ResResource res) throws IOException, AndrolibException {
+    public void serializeToResValuesXml(XmlSerializer serializer, ResResource res)
+            throws AndrolibException, IOException {
         String type = getType();
-        type = (type == null ? "" : type + "-") + "array";
+        type = (type != null ? type + "-" : "") + "array";
         serializer.startTag(null, type);
         serializer.attribute(null, "name", res.getResSpec().getName());
 
         // lets check if we need to add formatted="false" to this array
-        for (int i = 0; i < mItems.length; i++) {
-            if (mItems[i].hasMultipleNonPositionalSubstitutions()) {
+        for (ResScalarValue item : mItems) {
+            if (item.hasMultipleNonPositionalSubstitutions()) {
                 serializer.attribute(null, "formatted", "false");
                 break;
             }
         }
 
         // add <item>'s
-        for (int i = 0; i < mItems.length; i++) {
+        for (ResScalarValue item : mItems) {
             serializer.startTag(null, "item");
-            serializer.text(mItems[i].encodeAsResXmlNonEscapedItemValue());
+            serializer.text(item.encodeAsResXmlNonEscapedItemValue());
             serializer.endTag(null, "item");
         }
         serializer.endTag(null, type);
@@ -76,27 +74,22 @@ public class ResArrayValue extends ResBagValue implements
             return null;
         }
         String type = mItems[0].getType();
-        for (int i = 0; i < mItems.length; i++) {
-            if (mItems[i].encodeAsResXmlItemValue().startsWith("@string")) {
+        for (ResScalarValue item : mItems) {
+            if (item.encodeAsResXmlItemValue().startsWith("@string")) {
                 return "string";
-            } else if (mItems[i].encodeAsResXmlItemValue().startsWith("@drawable")) {
+            } else if (item.encodeAsResXmlItemValue().startsWith("@drawable")) {
                 return null;
-            } else if (mItems[i].encodeAsResXmlItemValue().startsWith("@integer")) {
+            } else if (item.encodeAsResXmlItemValue().startsWith("@integer")) {
                 return "integer";
             } else if (!"string".equals(type) && !"integer".equals(type)) {
                 return null;
-            } else if (!type.equals(mItems[i].getType())) {
+            } else if (!type.equals(item.getType())) {
                 return null;
             }
         }
-        if (!Arrays.asList(AllowedArrayTypes).contains(type)) {
+        if (!ALLOWED_ARRAY_TYPES.contains(type)) {
             return "string";
         }
         return type;
     }
-
-    private final ResScalarValue[] mItems;
-    private final String AllowedArrayTypes[] = {"string", "integer"};
-
-    public static final int BAG_KEY_ARRAY_START = 0x02000000;
 }

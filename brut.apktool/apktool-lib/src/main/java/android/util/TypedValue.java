@@ -1,24 +1,23 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ * Copyright (C) 2007 The Android Open Source Project
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package android.util;
 
 /**
  * Container for a dynamically typed data value. Primarily used with
- * {@link android.content.res.Resources} for holding resource values.
+ * Resources for holding resource values.
  */
 public class TypedValue {
     /** The value contains no data. */
@@ -120,7 +119,7 @@ public class TypedValue {
     /** Identifies the end of plain integer values. */
     public static final int TYPE_LAST_INT = 0x1f;
 
-	/* ------------------------------------------------------------ */
+    /* ------------------------------------------------------------ */
 
     /** Complex data: bit location of unit information. */
     public static final int COMPLEX_UNIT_SHIFT = 0;
@@ -183,7 +182,7 @@ public class TypedValue {
      */
     public static final int COMPLEX_MANTISSA_MASK = 0xffffff;
 
-	/* ------------------------------------------------------------ */
+    /* ------------------------------------------------------------ */
 
     /**
      * {@link #TYPE_NULL} data indicating the value was not specified.
@@ -197,19 +196,18 @@ public class TypedValue {
     /* ------------------------------------------------------------ */
 
     /**
-     * If {@link #density} is equal to this value, then the density should be
+     * If density is equal to this value, then the density should be
      * treated as the system's default density value:
-     * {@link DisplayMetrics#DENSITY_DEFAULT}.
      */
     public static final int DENSITY_DEFAULT = 0;
 
     /**
-     * If {@link #density} is equal to this value, then there is no density
+     * If density is equal to this value, then there is no density
      * associated with the resource and it should not be scaled.
      */
     public static final int DENSITY_NONE = 0xffff;
 
-	/* ------------------------------------------------------------ */
+    /* ------------------------------------------------------------ */
 
     /**
      * The type held by this value, as defined by the constants here. This tells
@@ -218,9 +216,10 @@ public class TypedValue {
     public int type;
 
     private static final float MANTISSA_MULT = 1.0f / (1 << TypedValue.COMPLEX_MANTISSA_SHIFT);
-    private static final float[] RADIX_MULTS = new float[] {
-            1.0f * MANTISSA_MULT, 1.0f / (1 << 7) * MANTISSA_MULT,
-            1.0f / (1 << 15) * MANTISSA_MULT, 1.0f / (1 << 23) * MANTISSA_MULT };
+    private static final float[] RADIX_MULTS = {
+            MANTISSA_MULT, 1.0f / (1 << 7) * MANTISSA_MULT,
+            1.0f / (1 << 15) * MANTISSA_MULT, 1.0f / (1 << 23) * MANTISSA_MULT
+    };
 
     /**
      * Retrieve the base value from a complex data integer. This uses the
@@ -239,23 +238,22 @@ public class TypedValue {
                 & TypedValue.COMPLEX_RADIX_MASK];
     }
 
-    private static final String[] DIMENSION_UNIT_STRS = new String[] { "px",
-            "dip", "sp", "pt", "in", "mm" };
-    private static final String[] FRACTION_UNIT_STRS = new String[] { "%", "%p" };
+    private static final String[] DIMENSION_UNIT_STRS = {
+            "px", "dip", "sp", "pt", "in", "mm"
+    };
+    private static final String[] FRACTION_UNIT_STRS = { "%", "%p" };
 
     /**
-     * Perform type conversion as per {@link #coerceToString()} on an explicitly
+     * Perform type conversion as per coerceToString on an explicitly
      * supplied type and data.
      *
-     * @param type
-     *            The data type identifier.
-     * @param data
-     *            The data value.
+     * @param type The data type identifier.
+     * @param data The data value.
      *
      * @return String The coerced string value. If the value is null or the type
      *         is not known, null is returned.
      */
-    public static final String coerceToString(int type, int data) {
+    public static String coerceToString(int type, int data) {
         switch (type) {
             case TYPE_NULL:
                 return null;
@@ -266,11 +264,11 @@ public class TypedValue {
             case TYPE_FLOAT:
                 return Float.toString(Float.intBitsToFloat(data));
             case TYPE_DIMENSION:
-                return Float.toString(complexToFloat(data))
+                return complexToFloat(data)
                         + DIMENSION_UNIT_STRS[(data >> COMPLEX_UNIT_SHIFT)
                         & COMPLEX_UNIT_MASK];
             case TYPE_FRACTION:
-                return Float.toString(complexToFloat(data) * 100)
+                return complexToFloat(data) * 100
                         + FRACTION_UNIT_STRS[(data >> COMPLEX_UNIT_SHIFT)
                         & COMPLEX_UNIT_MASK];
             case TYPE_INT_HEX:
@@ -290,22 +288,19 @@ public class TypedValue {
                     res = res.substring(2);
                     break;
                 case TYPE_INT_COLOR_ARGB4:// #AARRGGBB->#ARGB
-                    res = new StringBuffer().append(vals[0]).append(vals[2])
-                            .append(vals[4]).append(vals[6]).toString();
+                    res = String.valueOf(vals[0]) + vals[2] +
+                        vals[4] + vals[6];
                     break;
                 case TYPE_INT_COLOR_RGB4:// #FFRRGGBB->#RGB
-                    res = new StringBuffer().append(vals[2]).append(vals[4])
-                            .append(vals[6]).toString();
+                    res = String.valueOf(vals[2]) + vals[4] +
+                        vals[6];
                     break;
             }
             return "#" + res;
         } else if (type >= TYPE_FIRST_INT && type <= TYPE_LAST_INT) {
-            String res;
-            switch (type) {
-                default:
-                case TYPE_INT_DEC:
-                    res = Integer.toString(data);
-                    break;
+            String res = null;
+            if (type == TYPE_INT_DEC) {
+                res = Integer.toString(data);
             }
             return res;
         }

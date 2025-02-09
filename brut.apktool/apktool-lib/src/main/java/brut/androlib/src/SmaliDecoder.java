@@ -1,12 +1,12 @@
-/**
- *  Copyright (C) 2018 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2018 Connor Tumbleson <connor.tumbleson@gmail.com>
+/*
+ *  Copyright (C) 2010 Ryszard Wiśniewski <brut.alll@gmail.com>
+ *  Copyright (C) 2010 Connor Tumbleson <connor.tumbleson@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,39 +16,35 @@
  */
 package brut.androlib.src;
 
-import brut.androlib.AndrolibException;
-import org.jf.baksmali.Baksmali;
-import org.jf.baksmali.BaksmaliOptions;
-import org.jf.dexlib2.DexFileFactory;
-import org.jf.dexlib2.Opcodes;
-import org.jf.dexlib2.dexbacked.DexBackedDexFile;
-import org.jf.dexlib2.dexbacked.DexBackedOdexFile;
-import org.jf.dexlib2.analysis.InlineMethodResolver;
+import brut.androlib.exceptions.AndrolibException;
+import com.android.tools.smali.baksmali.Baksmali;
+import com.android.tools.smali.baksmali.BaksmaliOptions;
+import com.android.tools.smali.dexlib2.DexFileFactory;
+import com.android.tools.smali.dexlib2.Opcodes;
+import com.android.tools.smali.dexlib2.dexbacked.DexBackedDexFile;
+import com.android.tools.smali.dexlib2.dexbacked.DexBackedOdexFile;
+import com.android.tools.smali.dexlib2.analysis.InlineMethodResolver;
+import com.android.tools.smali.dexlib2.iface.DexFile;
+import com.android.tools.smali.dexlib2.iface.MultiDexContainer;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 
-/**
- * @author Ryszard Wiśniewski <brut.alll@gmail.com>
- */
 public class SmaliDecoder {
+    private final File mApkFile;
+    private final String mDexName;
+    private final boolean mBakDeb;
+    private final int mApiLevel;
 
-    public static void decode(File apkFile, File outDir, String dexName, boolean bakdeb, int api)
-            throws AndrolibException {
-        new SmaliDecoder(apkFile, outDir, dexName, bakdeb, api).decode();
-    }
-
-    private SmaliDecoder(File apkFile, File outDir, String dexName, boolean bakdeb, int api) {
+    public SmaliDecoder(File apkFile, String dexName, boolean bakDeb, int apiLevel) {
         mApkFile = apkFile;
-        mOutDir  = outDir;
-        mDexFile = dexName;
-        mBakDeb  = bakdeb;
-        mApi     = api;
+        mDexName = dexName;
+        mBakDeb = bakDeb;
+        mApiLevel = apiLevel;
     }
 
-    private void decode() throws AndrolibException {
+    public DexFile decode(File outDir) throws AndrolibException {
         try {
-            final BaksmaliOptions options = new BaksmaliOptions();
+            BaksmaliOptions options = new BaksmaliOptions();
 
             // options
             options.deodex = false;
@@ -68,27 +64,41 @@ public class SmaliDecoder {
                 jobs = 6;
             }
 
-            // create the dex
-            DexBackedDexFile dexFile = DexFileFactory.loadDexEntry(mApkFile, mDexFile, true, Opcodes.forApi(mApi));
+            // create the container
+            MultiDexContainer<? extends DexBackedDexFile> container =
+                    DexFileFactory.loadDexContainer(mApkFile, mApiLevel > 0 ? Opcodes.forApi(mApiLevel) : null);
+            MultiDexContainer.DexEntry<? extends DexBackedDexFile> dexEntry;
+            DexBackedDexFile dexFile;
 
-            if (dexFile.isOdexFile()) {
+            // If we have 1 item, ignore the passed file. Pull the DexFile we need.
+            if (container.getDexEntryNames().size() == 1) {
+                dexEntry = container.getEntry(container.getDexEntryNames().get(0));
+            } else {
+                dexEntry = container.getEntry(mDexName);
+            }
+
+            // Double-check the passed param exists
+            if (dexEntry == null) {
+                dexEntry = container.getEntry(container.getDexEntryNames().get(0));
+            }
+
+            assert dexEntry != null;
+            dexFile = dexEntry.getDexFile();
+
+            if (dexFile.supportsOptimizedOpcodes()) {
                 throw new AndrolibException("Warning: You are disassembling an odex file without deodexing it.");
             }
 
             if (dexFile instanceof DexBackedOdexFile) {
                 options.inlineResolver =
-                        InlineMethodResolver.createInlineMethodResolver(((DexBackedOdexFile)dexFile).getOdexVersion());
+                        InlineMethodResolver.createInlineMethodResolver(((DexBackedOdexFile) dexFile).getOdexVersion());
             }
 
-            Baksmali.disassembleDexFile(dexFile, mOutDir, jobs, options);
+            Baksmali.disassembleDexFile(dexFile, outDir, jobs, options);
+
+            return dexFile;
         } catch (IOException ex) {
-            throw new AndrolibException(ex);
+            throw new AndrolibException("Could not baksmali file: " + mDexName, ex);
         }
     }
-
-    private final File mApkFile;
-    private final File mOutDir;
-    private final String mDexFile;
-    private final boolean mBakDeb;
-    private final int mApi;
 }
